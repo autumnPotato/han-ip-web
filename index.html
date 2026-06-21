@@ -35,7 +35,6 @@
             padding-bottom: 80px;
         }
 
-        /* 1. Header & Calendar */
         header { padding: 20px 20px 10px; }
         .header-title { font-size: 24px; font-weight: 700; margin-bottom: 15px; }
         .header-title span { color: var(--accent-color); }
@@ -56,7 +55,7 @@
             padding: 8px 4px;
             border-radius: 8px;
             cursor: pointer;
-            flex: 1; /* 7일이 균등하게 화면을 나누어 가지도록 설정 */
+            flex: 1;
             min-width: 0;
             transition: 0.2s;
         }
@@ -64,7 +63,6 @@
         .day-name { font-size: 11px; margin-bottom: 4px; font-weight: 500; }
         .day-date { font-size: 15px; font-weight: 700; }
 
-        /* 2. Building Filter */
         .building-filter {
             display: flex;
             overflow-x: auto;
@@ -91,7 +89,6 @@
             border-color: #fff;
         }
 
-        /* 3. Meal Time Tabs */
         .meal-tabs {
             display: flex;
             padding: 0 20px;
@@ -115,7 +112,6 @@
             border-color: var(--accent-color);
         }
 
-        /* 4. Menu List & Cards */
         .menu-container { padding: 0 20px; display: flex; flex-direction: column; gap: 15px; }
         
         .menu-card {
@@ -144,7 +140,6 @@
         }
 
         .op-time { font-size: 12px; color: var(--text-sub); }
-
         .menu-title { font-size: 18px; font-weight: 700; margin-bottom: 8px; }
         .menu-items { color: var(--text-sub); font-size: 14px; margin-bottom: 15px; line-height: 1.5; }
         
@@ -157,7 +152,6 @@
         }
         .price { font-weight: 700; font-size: 18px; }
 
-        /* Sold Out UI */
         .menu-card.sold-out::after {
             content: '품절 (Sold Out)';
             position: absolute;
@@ -174,6 +168,7 @@
         }
 
         .empty-state { text-align: center; padding: 50px 20px; color: var(--text-sub); line-height: 1.6; font-size: 15px; }
+        .error-state { text-align: center; padding: 60px 20px; color: var(--text-sub); font-size: 15px; margin-top: 20px; }
     </style>
 </head>
 <body>
@@ -187,7 +182,7 @@
     <div class="building-filter" id="building-container">
         <button class="building-btn active" onclick="setBuilding('한투스퀘어')">한투스퀘어</button>
         <button class="building-btn" onclick="setBuilding('교우회관')">교우회관</button>
-        <button class="building-btn" onclick="setBuilding('기숙사')">기숙사 식당</button>
+        <button class="building-btn" onclick="setBuilding('기숙사 식당')">기숙사 식당</button>
     </div>
 
     <div class="meal-tabs">
@@ -201,19 +196,26 @@
 </div>
 
 <script>
+    let db = null; // 외부 data.json을 받아올 전역 변수
     let currentBuilding = '한투스퀘어';
     let currentMeal = '중식';
-    let currentDayName = ''; // 현재 선택된 요일 이름 (월, 화, 수...)
-    let db = {}; 
+    let currentDayName = ''; 
 
+    // 외부 data.json 파일을 비동기적으로 호출하는 정석 API 통신 함수
     async function fetchMenuData() {
+        const container = document.getElementById('menu-list');
         try {
-            const response = await fetch('data.json'); 
-            db = await response.json(); 
-            renderMenus(); 
+            // 외부 파일 패치 요청
+            const response = await fetch('data.json');
+            if (!response.ok) {
+                throw new Error('네트워크 응답 오류 발생');
+            }
+            db = await response.json();
+            renderMenus(); // 성공 시 데이터 바인딩 및 화면 렌더링
         } catch (error) {
-            console.error("데이터를 불러오는데 실패했습니다:", error);
-            document.getElementById('menu-list').innerHTML = '<div class="empty-state">메뉴 데이터를 서버에서 불러올 수 없습니다.</div>';
+            console.error('API Fetch 실패:', error);
+            // 업로드 전 로컬 브라우저 보안 에러 혹은 주소 누락 시 스크린샷 4의 오류 메시지 출력
+            container.innerHTML = `<div class="error-state">메뉴 데이터를 서버에서 불러올 수 없습니다.</div>`;
         }
     }
 
@@ -223,13 +225,11 @@
         const dayNames = ['일', '월', '화', '수', '목', '금', '토'];
         const currentDay = today.getDay();
         
-        // 이번 주 월요일 날짜 계산
         const monday = new Date(today);
         monday.setDate(today.getDate() - currentDay + (currentDay === 0 ? -6 : 1));
 
         container.innerHTML = '';
 
-        // 월요일부터 일요일까지 총 7일을 화면에 생성
         for (let i = 0; i < 7; i++) {
             const date = new Date(monday);
             date.setDate(monday.getDate() + i);
@@ -237,7 +237,7 @@
             const isToday = date.toDateString() === today.toDateString();
             
             if (isToday) {
-                currentDayName = dayName; // 앱 최초 접속 시 오늘 요일을 기본값으로 타겟팅
+                currentDayName = dayName; 
             }
             
             const tab = document.createElement('div');
@@ -250,7 +250,7 @@
             tab.onclick = () => {
                 document.querySelectorAll('.day-tab').forEach(t => t.classList.remove('active'));
                 tab.classList.add('active');
-                currentDayName = dayName; // 클릭한 요일로 전역 변수 업데이트
+                currentDayName = dayName; 
                 renderMenus();
             };
             container.appendChild(tab);
@@ -265,7 +265,7 @@
         currentBuilding = buildingName;
         document.querySelectorAll('.building-btn').forEach(btn => {
             btn.classList.remove('active');
-            if(btn.innerText.includes(buildingName)) btn.classList.add('active');
+            if(btn.innerText.trim() === buildingName.trim()) btn.classList.add('active');
         });
         renderMenus();
     }
@@ -281,16 +281,13 @@
 
     function renderMenus() {
         const container = document.getElementById('menu-list');
-        
-        // ★ 주말 예외 처리 로직 추가
+        if (!db) return; // 데이터가 아직 안 온 경우 중단
+
         if (currentDayName === '토' || currentDayName === '일') {
-            container.innerHTML = `<div class="empty-state"> 주말에는 학식을 운영하지 않습니다.<br>평일에 다시 찾아주세요! ✨</div>`;
+            container.innerHTML = `<div class="empty-state">주말에는 학식을 운영하지 않습니다.<br>평일에 다시 찾아주세요! ✨</div>`;
             return;
         }
 
-        if (Object.keys(db).length === 0) return; 
-
-        // db[건물][요일][시간대] 형태로 트리 가동
         const buildingData = db[currentBuilding] || {};
         const dayData = buildingData[currentDayName] || {};
         const menus = dayData[currentMeal] || [];
@@ -309,7 +306,7 @@
             card.innerHTML = `
                 <div class="card-header">
                     <span class="corner-badge">${menu.corner}</span>
-                    <span class="op-time"><i class="fa-regular fa-clock"></i> ${menu.time}</span>
+                    <span class="op-time">${menu.time}</span>
                 </div>
                 <div class="menu-title">${menu.name}</div>
                 <div class="menu-items">${menu.items}</div>
@@ -332,10 +329,8 @@
         else if (hour < 14) setMeal('중식');
         else setMeal('석식');
 
-        fetchMenuData(); 
+        fetchMenuData(); // 앱 시작 시 API로 데이터 패치 실행
     };
 </script>
-
-<script src="https://kit.fontawesome.com/a076d05399.js" crossorigin="anonymous"></script>
 </body>
 </html>
