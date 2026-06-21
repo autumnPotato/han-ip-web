@@ -47,20 +47,22 @@
             border-radius: 12px;
             padding: 10px;
             margin-bottom: 20px;
+            gap: 4px;
         }
         .day-tab {
             display: flex;
             flex-direction: column;
             align-items: center;
-            padding: 8px;
+            padding: 8px 4px;
             border-radius: 8px;
             cursor: pointer;
-            width: 18%;
+            flex: 1; /* 7일이 균등하게 화면을 나누어 가지도록 설정 */
+            min-width: 0;
             transition: 0.2s;
         }
         .day-tab.active { background-color: var(--accent-color); color: #000; }
-        .day-name { font-size: 12px; margin-bottom: 4px; font-weight: 500; }
-        .day-date { font-size: 16px; font-weight: 700; }
+        .day-name { font-size: 11px; margin-bottom: 4px; font-weight: 500; }
+        .day-date { font-size: 15px; font-weight: 700; }
 
         /* 2. Building Filter */
         .building-filter {
@@ -171,7 +173,7 @@
             z-index: 10;
         }
 
-        .empty-state { text-align: center; padding: 40px 0; color: var(--text-sub); }
+        .empty-state { text-align: center; padding: 50px 20px; color: var(--text-sub); line-height: 1.6; font-size: 15px; }
     </style>
 </head>
 <body>
@@ -201,9 +203,9 @@
 <script>
     let currentBuilding = '한투스퀘어';
     let currentMeal = '중식';
+    let currentDayName = ''; // 현재 선택된 요일 이름 (월, 화, 수...)
     let db = {}; 
 
-    // 외부 파일(data.json)에서 데이터를 불러오는 함수
     async function fetchMenuData() {
         try {
             const response = await fetch('data.json'); 
@@ -220,27 +222,42 @@
         const container = document.getElementById('calendar-container');
         const dayNames = ['일', '월', '화', '수', '목', '금', '토'];
         const currentDay = today.getDay();
+        
+        // 이번 주 월요일 날짜 계산
         const monday = new Date(today);
         monday.setDate(today.getDate() - currentDay + (currentDay === 0 ? -6 : 1));
 
-        for (let i = 0; i < 5; i++) {
+        container.innerHTML = '';
+
+        // 월요일부터 일요일까지 총 7일을 화면에 생성
+        for (let i = 0; i < 7; i++) {
             const date = new Date(monday);
             date.setDate(monday.getDate() + i);
+            const dayName = dayNames[date.getDay()];
             const isToday = date.toDateString() === today.toDateString();
+            
+            if (isToday) {
+                currentDayName = dayName; // 앱 최초 접속 시 오늘 요일을 기본값으로 타겟팅
+            }
             
             const tab = document.createElement('div');
             tab.className = `day-tab ${isToday ? 'active' : ''}`;
             tab.innerHTML = `
-                <div class="day-name">${dayNames[date.getDay()]}</div>
+                <div class="day-name">${dayName}</div>
                 <div class="day-date">${date.getDate()}</div>
             `;
             
             tab.onclick = () => {
                 document.querySelectorAll('.day-tab').forEach(t => t.classList.remove('active'));
                 tab.classList.add('active');
+                currentDayName = dayName; // 클릭한 요일로 전역 변수 업데이트
                 renderMenus();
             };
             container.appendChild(tab);
+        }
+
+        if (!currentDayName) {
+            currentDayName = dayNames[today.getDay()];
         }
     }
 
@@ -264,9 +281,20 @@
 
     function renderMenus() {
         const container = document.getElementById('menu-list');
+        
+        // ★ 주말 예외 처리 로직 추가
+        if (currentDayName === '토' || currentDayName === '일') {
+            container.innerHTML = `<div class="empty-state"> 주말에는 학식을 운영하지 않습니다.<br>평일에 다시 찾아주세요! ✨</div>`;
+            return;
+        }
+
         if (Object.keys(db).length === 0) return; 
 
-        const menus = db[currentBuilding] ? db[currentBuilding][currentMeal] : [];
+        // db[건물][요일][시간대] 형태로 트리 가동
+        const buildingData = db[currentBuilding] || {};
+        const dayData = buildingData[currentDayName] || {};
+        const menus = dayData[currentMeal] || [];
+        
         container.innerHTML = ''; 
 
         if (!menus || menus.length === 0) {
